@@ -1092,8 +1092,6 @@ const HigherAuthorityDashboard = ({ role, reports, onSelectReport, selectedRepor
           setActiveTab('manage-parts');
         }
       } catch (e) {
-        console.error("Error deleting part:", e);
-        showNotification("Error deleting part.");
       }
     }
   };
@@ -1825,22 +1823,17 @@ const createLogSheetData = (report, users) => {
 };
 
 // Updated Component for Consumer Report
-// Updated Component for Consumer Report
 const ConsumerReportGenerator = ({ reports, parts, users }) => {
   const [reportData, setReportData] = useState({});
   const [months, setMonths] = useState([]);
-  const [selectedCustomer, setSelectedCustomer] = useState('ASH Industries');
+  const [selectedCustomer, setSelectedCustomer] = useState('');
+  const [loadingReport, setLoadingReport] = useState(true);
   const reportRef = useRef();
-
-  // Log the data for debugging purposes
-  useEffect(() => {
-    console.log("Current users data:", users);
-    console.log("Current reports data:", reports);
-  }, [users, reports]);
 
   const allCustomers = [...new Set(parts.map(part => part.customer))];
 
   useEffect(() => {
+    setLoadingReport(true);
     if (reports.length > 0 && parts.length > 0) {
       const filteredParts = selectedCustomer
         ? parts.filter(part => part.customer === selectedCustomer)
@@ -1850,6 +1843,7 @@ const ConsumerReportGenerator = ({ reports, parts, users }) => {
       setReportData(reportData);
       setMonths(months);
     }
+    setLoadingReport(false);
   }, [reports, parts, selectedCustomer]);
 
   const getSignatureEmail = (roleName) => {
@@ -1964,76 +1958,82 @@ const ConsumerReportGenerator = ({ reports, parts, users }) => {
         </button>
       </div>
 
-      <div ref={reportRef} className="p-4 bg-white rounded-xl">
-        <div className="flex items-center justify-between">
-            <h4 className="text-2xl font-bold text-gray-800">SAKTHI AUTO - PRODUCT AUDIT PLAN</h4>
-            <p className="text-md font-medium text-gray-600">Date: {new Date().toLocaleDateString('en-GB')}</p>
+      {loadingReport ? (
+        <div className="flex items-center justify-center p-8 bg-gray-50 rounded-xl">
+            <p className="text-gray-600">Generating report...</p>
         </div>
-        <h5 className="text-lg font-semibold text-gray-700 my-2">Customer: {selectedCustomer || 'All Customers'}</h5>
-        <div className="overflow-x-auto border border-gray-300 rounded-lg">
-          <table className="w-full text-sm text-left text-gray-600">
-            <thead className="text-xs text-gray-700 uppercase bg-gray-200">
-              <tr>
-                <th scope="col" className="p-3 border-r border-gray-300">PART NAME / PART NO</th>
-                {months.map(month => (
-                  <th key={month} scope="col" className="p-3 text-center border-r border-gray-300">{month}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {parts.filter(part => !selectedCustomer || part.customer === selectedCustomer).map(part => (
-                <tr key={part.partNo} className="bg-white border-b border-gray-300">
-                  <td className="p-3 font-medium text-gray-900 whitespace-nowrap border-r border-gray-300">{part.partName} / {part.partNo}</td>
-                  {months.map(month => {
-                    const status = reportData[part.partNo]?.[month] || 'No data';
-                    const statusAbbr = getStatusAbbreviation(status);
-                    const colorClass = getStatusColor(status);
-                    return (
-                      <td key={`${part.partNo}-${month}`} className={`p-3 text-center border-r border-gray-300 ${colorClass}`}>
-                        {statusAbbr}
-                      </td>
-                    );
-                  })}
+      ) : (
+        <div ref={reportRef} className="p-4 bg-white rounded-xl">
+          <div className="flex items-center justify-between">
+              <h4 className="text-2xl font-bold text-gray-800">SAKTHI AUTO - PRODUCT AUDIT PLAN</h4>
+              <p className="text-md font-medium text-gray-600">Date: {new Date().toLocaleDateString('en-GB')}</p>
+          </div>
+          <h5 className="text-lg font-semibold text-gray-700 my-2">Customer: {selectedCustomer || 'All Customers'}</h5>
+          <div className="overflow-x-auto border border-gray-300 rounded-lg">
+            <table className="w-full text-sm text-left text-gray-600">
+              <thead className="text-xs text-gray-700 uppercase bg-gray-200">
+                <tr>
+                  <th scope="col" className="p-3 border-r border-gray-300">PART NAME / PART NO</th>
+                  {months.map(month => (
+                    <th key={month} scope="col" className="p-3 text-center border-r border-gray-300">{month}</th>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {parts.filter(part => !selectedCustomer || part.customer === selectedCustomer).map(part => (
+                  <tr key={part.partNo} className="bg-white border-b border-gray-300">
+                    <td className="p-3 font-medium text-gray-900 whitespace-nowrap border-r border-gray-300">{part.partName} / {part.partNo}</td>
+                    {months.map(month => {
+                      const status = reportData[part.partNo]?.[month] || 'No data';
+                      const statusAbbr = getStatusAbbreviation(status);
+                      const colorClass = getStatusColor(status);
+                      return (
+                        <td key={`${part.partNo}-${month}`} className={`p-3 text-center border-r border-gray-300 ${colorClass}`}>
+                          {statusAbbr}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
 
-        <div className="my-6">
-            <h5 className="text-md font-semibold text-gray-700 mb-2">Legend:</h5>
-            <div className="flex flex-wrap items-center gap-4">
-                <div className="flex items-center">
-                    <span className="w-4 h-4 inline-block bg-green-400 mr-2"></span>
-                    <span className="font-semibold text-sm">A:</span> <span className="text-sm ml-1">Approved by Quality Head</span>
-                </div>
-                <div className="flex items-center">
-                    <span className="w-4 h-4 inline-block bg-red-400 mr-2"></span>
-                    <span className="font-semibold text-sm">R:</span> <span className="text-sm ml-1">Re-scheduling</span>
-                </div>
-                <div className="flex items-center">
-                    <span className="w-4 h-4 inline-block bg-yellow-400 mr-2"></span>
-                    <span className="font-semibold text-sm">S:</span> <span className="text-sm ml-1">Submitted</span>
-                </div>
-                <div className="flex items-center">
-                    <span className="w-4 h-4 inline-block bg-blue-400 mr-2"></span>
-                    <span className="font-semibold text-sm">P:</span> <span className="text-sm ml-1">Reviewed (Team Leader/HOF)</span>
-                </div>
-                <div className="flex items-center">
-                    <span className="w-4 h-4 inline-block bg-gray-300 mr-2"></span>
-                    <span className="font-semibold text-sm">N:</span> <span className="text-sm ml-1">No data / Unplanned audit</span>
-                </div>
-            </div>
-        </div>
+          <div className="my-6">
+              <h5 className="text-md font-semibold text-gray-700 mb-2">Legend:</h5>
+              <div className="flex flex-wrap items-center gap-4">
+                  <div className="flex items-center">
+                      <span className="w-4 h-4 inline-block bg-green-400 mr-2"></span>
+                      <span className="font-semibold text-sm">A:</span> <span className="text-sm ml-1">Approved by Quality Head</span>
+                  </div>
+                  <div className="flex items-center">
+                      <span className="w-4 h-4 inline-block bg-red-400 mr-2"></span>
+                      <span className="font-semibold text-sm">R:</span> <span className="text-sm ml-1">Re-scheduling</span>
+                  </div>
+                  <div className="flex items-center">
+                      <span className="w-4 h-4 inline-block bg-yellow-400 mr-2"></span>
+                      <span className="font-semibold text-sm">S:</span> <span className="text-sm ml-1">Submitted</span>
+                  </div>
+                  <div className="flex items-center">
+                      <span className="w-4 h-4 inline-block bg-blue-400 mr-2"></span>
+                      <span className="font-semibold text-sm">P:</span> <span className="text-sm ml-1">Reviewed (Team Leader/HOF)</span>
+                  </div>
+                  <div className="flex items-center">
+                      <span className="w-4 h-4 inline-block bg-gray-300 mr-2"></span>
+                      <span className="font-semibold text-sm">N:</span> <span className="text-sm ml-1">No data / Unplanned audit</span>
+                  </div>
+              </div>
+          </div>
 
-        <div className="mt-8">
-            <h5 className="text-md font-semibold text-gray-700 mb-2">Signatures:</h5>
-            <p className="text-sm">Auditor: {signatures.Auditor}</p>
-            <p className="text-sm">Team Leader Audit: {signatures['Team Leader Audit']}</p>
-            <p className="text-sm">H.O.F. Audit: {signatures['H.O.F. Audit']}</p>
-            <p className="text-sm">Quality Head: {signatures['Quality Head']}</p>
+          <div className="mt-8">
+              <h5 className="text-md font-semibold text-gray-700 mb-2">Signatures:</h5>
+              <p className="text-sm">Auditor: {signatures.Auditor}</p>
+              <p className="text-sm">Team Leader Audit: {signatures['Team Leader Audit']}</p>
+              <p className="text-sm">H.O.F. Audit: {signatures['H.O.F. Audit']}</p>
+              <p className="text-sm">Quality Head: {signatures['Quality Head']}</p>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };

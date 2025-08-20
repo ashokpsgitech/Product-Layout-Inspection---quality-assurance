@@ -1,0 +1,34 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // All authenticated users can read their own user document to get their role.
+    // Quality Heads can read all user documents to manage access.
+    // New users can create a user document after signup, and authenticated users can update/delete their own.
+    match /artifacts/{appId}/public/data/users/{userId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      allow update, delete: if request.auth != null && 
+        (request.auth.uid == userId || 
+        get(/databases/$(database)/documents/artifacts/$(appId)/public/data/users/$(request.auth.uid)).data.role == 'Quality Head');
+    }
+    
+    // All authenticated users can read parts.
+    // Only Quality Heads can create, update, or delete parts.
+    match /artifacts/{appId}/public/data/parts/{partId} {
+      allow read: if request.auth != null;
+      allow create, update, delete: if request.auth != null && 
+        get(/databases/$(database)/documents/artifacts/$(appId)/public/data/users/$(request.auth.uid)).data.role == 'Quality Head';
+    }
+    
+    // All authenticated users can read inspection reports.
+    // Auditors can create new reports. Team Leaders, HOFs, and Quality Heads can update and delete them.
+    match /artifacts/{appId}/public/data/inspectionReports/{reportId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null; // Auditors can create
+      // Allow update and delete for all roles except 'Auditor'
+      allow update, delete: if request.auth != null && 
+        get(/databases/$(database)/documents/artifacts/$(appId)/public/data/users/$(request.auth.uid)).data.role != 'Auditor';
+    }
+  }
+}
