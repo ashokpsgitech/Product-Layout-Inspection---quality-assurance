@@ -40,13 +40,13 @@ const STATUS = {
 };
 
 const firebaseConfig = {
-  apiKey: "AIzaSyAGZ_GUigBhYdHXNmQzTlizou-71VzJwBI",
-  authDomain: "my-quality-control-app.firebaseapp.com",
-  projectId: "my-quality-control-app",
-  storageBucket: "my-quality-control-app.firebasestorage.app",
-  messagingSenderId: "367433401554",
-  appId: "1:367433401554:web:8624d831f1489265e9190b",
-  measurementId: "G-DYVJQGCFBW"
+  apiKey: ,
+  authDomain: ,
+  projectId:   ,
+  storageBucket:   ,
+  messagingSenderId:   ,
+  appId: ,
+  measurementId: 
 };
 
 // Use a placeholder appId for Firestore collection path.
