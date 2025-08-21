@@ -41,13 +41,13 @@ const STATUS = {
 };
 
 const firebaseConfig = {
-  apiKey: ,
-  authDomain: ,
-  projectId: ,
-  storageBucket: ,
-  messagingSenderId: ,
-  appId: ,
-  measurementId: 
+  apiKey: "AIzaSyAGZ_GUigBhYdHXNmQzTlizou-71VzJwBI",
+  authDomain: "my-quality-control-app.firebaseapp.com",
+  projectId: "my-quality-control-app",
+  storageBucket: "my-quality-control-app.firebasestorage.app",
+  messagingSenderId: "367433401554",
+  appId: "1:367433401554:web:8624d831f1489265e9190b",
+  measurementId: "G-DYVJQGCFBW"
 };
 // Use a placeholder appId for Firestore collection path.
 // This is not the same as the app ID in firebaseConfig.
@@ -357,15 +357,30 @@ const App = () => {
     }
   };
 
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const cooldownRef = useRef(null);
+
+  useEffect(() => {
+    if (resendCooldown > 0) {
+      cooldownRef.current = setTimeout(() => {
+        setResendCooldown(resendCooldown - 1);
+      }, 1000);
+    }
+    return () => clearTimeout(cooldownRef.current);
+  }, [resendCooldown]);
+
   const handleResendVerification = async () => {
-    if (user) {
+    if (user && resendCooldown === 0) {
       try {
         await sendEmailVerification(user);
         showCustomNotification("Verification email resent. Please check your inbox.");
+        setResendCooldown(60);
       } catch (e) {
         console.error("Error resending verification email:", e);
         showCustomNotification("Failed to resend verification email. Please try again.");
       }
+    } else if (resendCooldown > 0) {
+      showCustomNotification(`Please wait ${resendCooldown} seconds before resending.`);
     }
   };
 
@@ -433,6 +448,27 @@ const App = () => {
 
 // New Component for Email Verification
 const VerificationPrompt = ({ user, onResendVerification, showNotification }) => {
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const cooldownRef = useRef(null);
+
+  useEffect(() => {
+    if (resendCooldown > 0) {
+      cooldownRef.current = setTimeout(() => {
+        setResendCooldown(resendCooldown - 1);
+      }, 1000);
+    }
+    return () => clearTimeout(cooldownRef.current);
+  }, [resendCooldown]);
+
+  const handleResendClick = async () => {
+    if (resendCooldown > 0) {
+      showNotification(`Please wait ${resendCooldown} seconds before resending.`);
+      return;
+    }
+    await onResendVerification();
+    setResendCooldown(60);
+  };
+
   return (
     <div className="bg-white p-8 rounded-xl shadow-lg border-b-4 border-orange-500 text-center max-w-lg mx-auto">
       <h2 className="text-3xl font-bold mb-4 text-gray-800">Verify Your Email</h2>
@@ -444,10 +480,11 @@ const VerificationPrompt = ({ user, onResendVerification, showNotification }) =>
         Once verified, you will be able to access the dashboard.
       </p>
       <button
-        onClick={onResendVerification}
-        className="w-full sm:w-auto px-6 py-3 bg-orange-600 text-white font-semibold rounded-lg shadow-md hover:bg-orange-700 transition duration-300 transform hover:scale-105"
+        onClick={handleResendClick}
+        className="w-full sm:w-auto px-6 py-3 bg-orange-600 text-white font-semibold rounded-lg shadow-md hover:bg-orange-700 transition duration-300 transform hover:scale-105 disabled:bg-gray-400"
+        disabled={resendCooldown > 0}
       >
-        Resend Verification Email
+        {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend Verification Email'}
       </button>
     </div>
   );
@@ -2088,16 +2125,28 @@ const ConsumerReportGenerator = ({ reports, parts, users }) => {
   );
 };
 
+// New statuses object to define the order of progression
+const STATUS_ORDER = {
+  'Re-scheduling': 5, // Lowest priority, indicates rejection
+  'No data': 0,
+  'Submitted': 1,
+  'Reviewed by Team Leader Audit': 2,
+  'Reviewed by H.O.F. Audit': 3,
+  'Approved': 4 // Highest priority, indicates final approval
+};
+
 const createConsumerReportData = (reports, parts) => {
   const reportData = {};
   const months = [];
   const today = new Date();
 
+  // Create a list of the last 12 months
   for (let i = 11; i >= 0; i--) {
     const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
     months.push(d.toLocaleString('default', { month: 'short', year: 'numeric' }));
   }
 
+  // Initialize reportData for all parts and months
   parts.forEach(part => {
     reportData[part.partNo] = {};
     months.forEach(month => {
@@ -2105,20 +2154,20 @@ const createConsumerReportData = (reports, parts) => {
     });
   });
 
+  // Process reports and update with the highest status
   reports.forEach(report => {
     if (report.submissionDate && report.partNo) {
       const reportDate = report.submissionDate.toDate();
       const reportMonth = reportDate.toLocaleString('default', { month: 'short', year: 'numeric' });
-
-      if (reportData[report.partNo]) {
-        const existingReport = reports.find(r =>
-          r.partNo === report.partNo &&
-          r.submissionDate?.toDate().toLocaleString('default', { month: 'short', year: 'numeric' }) === reportMonth
-        );
-
-        if (!existingReport || reportDate > existingReport.submissionDate.toDate()) {
-          reportData[report.partNo][reportMonth] = report.status;
-        }
+      const currentStatus = report.status;
+      const existingStatus = reportData[report.partNo]?.[reportMonth];
+      
+      // Check if the current report has a higher status than the existing one
+      if (
+        reportData[report.partNo] &&
+        (STATUS_ORDER[currentStatus] > STATUS_ORDER[existingStatus] || !existingStatus)
+      ) {
+        reportData[report.partNo][reportMonth] = currentStatus;
       }
     }
   });
