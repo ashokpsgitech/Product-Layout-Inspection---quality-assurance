@@ -6,7 +6,8 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signOut,
-  sendPasswordResetEmail
+  sendPasswordResetEmail,
+  sendEmailVerification // Added for email verification
 } from 'firebase/auth';
 import {
   getFirestore,
@@ -42,13 +43,12 @@ const STATUS = {
 const firebaseConfig = {
   apiKey: ,
   authDomain: ,
-  projectId:   ,
-  storageBucket:   ,
-  messagingSenderId:   ,
+  projectId: ,
+  storageBucket: ,
+  messagingSenderId: ,
   appId: ,
   measurementId: 
 };
-
 // Use a placeholder appId for Firestore collection path.
 // This is not the same as the app ID in firebaseConfig.
 const appId = "local-quality-control-app";
@@ -261,6 +261,17 @@ const App = () => {
         </div>
       );
     }
+    
+    // Check for email verification
+    if (!user.emailVerified) {
+      return (
+        <VerificationPrompt
+          user={user}
+          onResendVerification={handleResendVerification}
+          showNotification={showCustomNotification}
+        />
+      );
+    }
 
     if (role === 'Auditor') {
       return <AuditorDashboard user={user} db={db} appId={appId} showNotification={showCustomNotification} parts={parts} reports={reports} users={users} />;
@@ -287,6 +298,7 @@ const App = () => {
   const handleLogin = async (email, password) => {
     try {
       await signInWithEmailAndPassword(auth, email, password);
+      // User is logged in, but we still need to check if their email is verified
       showCustomNotification("Logged in successfully!");
     } catch (e) {
       console.error("Login error:", e);
@@ -308,7 +320,11 @@ const App = () => {
         role: role,
         createdAt: new Date(),
       });
-      showCustomNotification("Signed up and logged in successfully!");
+      
+      // Send email verification link
+      await sendEmailVerification(userCredential.user);
+      showCustomNotification("Signed up successfully! A verification email has been sent. Please check your inbox.");
+
     } catch (e) {
       let errorMessage = "Signup failed. Please try again.";
       if (e.code === 'auth/email-already-in-use') {
@@ -338,6 +354,18 @@ const App = () => {
       }
       showCustomNotification(errorMessage);
       return false;
+    }
+  };
+
+  const handleResendVerification = async () => {
+    if (user) {
+      try {
+        await sendEmailVerification(user);
+        showCustomNotification("Verification email resent. Please check your inbox.");
+      } catch (e) {
+        console.error("Error resending verification email:", e);
+        showCustomNotification("Failed to resend verification email. Please try again.");
+      }
     }
   };
 
@@ -389,9 +417,9 @@ const App = () => {
               </div>
             )}
           </header>
-          <main className="min-h-[60vh] flex items-center justify-center">
-            {user ? renderDashboard() : <div className="text-center p-8 bg-white rounded-xl shadow-lg">Please log in to continue.</div>}
-          </main>
+            <main className="min-h-[60vh] flex items-center justify-center">
+              {user ? renderDashboard() : <div className="text-center p-8 bg-white rounded-xl shadow-lg">Please log in to continue.</div>}
+            </main>
           {showNotification && (
             <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 p-4 rounded-lg bg-green-500 text-white shadow-lg z-50 transition-opacity duration-300 ease-in-out">
               {notificationMessage}
@@ -400,6 +428,28 @@ const App = () => {
         </div>
       </div>
     </>
+  );
+};
+
+// New Component for Email Verification
+const VerificationPrompt = ({ user, onResendVerification, showNotification }) => {
+  return (
+    <div className="bg-white p-8 rounded-xl shadow-lg border-b-4 border-orange-500 text-center max-w-lg mx-auto">
+      <h2 className="text-3xl font-bold mb-4 text-gray-800">Verify Your Email</h2>
+      <p className="text-gray-700 mb-4">
+        A verification link has been sent to <span className="font-semibold">{user.email}</span>.
+        Please check your inbox (and spam folder) and click the link to verify your account.
+      </p>
+      <p className="text-gray-500 text-sm mb-6">
+        Once verified, you will be able to access the dashboard.
+      </p>
+      <button
+        onClick={onResendVerification}
+        className="w-full sm:w-auto px-6 py-3 bg-orange-600 text-white font-semibold rounded-lg shadow-md hover:bg-orange-700 transition duration-300 transform hover:scale-105"
+      >
+        Resend Verification Email
+      </button>
+    </div>
   );
 };
 
@@ -2002,26 +2052,26 @@ const ConsumerReportGenerator = ({ reports, parts, users }) => {
           <div className="my-6">
               <h5 className="text-md font-semibold text-gray-700 mb-2">Legend:</h5>
               <div className="flex flex-wrap items-center gap-4">
-                  <div className="flex items-center">
-                      <span className="w-4 h-4 inline-block bg-green-400 mr-2"></span>
-                      <span className="font-semibold text-sm">A:</span> <span className="text-sm ml-1">Approved by Quality Head</span>
-                  </div>
-                  <div className="flex items-center">
-                      <span className="w-4 h-4 inline-block bg-red-400 mr-2"></span>
-                      <span className="font-semibold text-sm">R:</span> <span className="text-sm ml-1">Re-scheduling</span>
-                  </div>
-                  <div className="flex items-center">
-                      <span className="w-4 h-4 inline-block bg-yellow-400 mr-2"></span>
-                      <span className="font-semibold text-sm">S:</span> <span className="text-sm ml-1">Submitted</span>
-                  </div>
-                  <div className="flex items-center">
-                      <span className="w-4 h-4 inline-block bg-blue-400 mr-2"></span>
-                      <span className="font-semibold text-sm">P:</span> <span className="text-sm ml-1">Reviewed (Team Leader/HOF)</span>
-                  </div>
-                  <div className="flex items-center">
-                      <span className="w-4 h-4 inline-block bg-gray-300 mr-2"></span>
-                      <span className="font-semibold text-sm">N:</span> <span className="text-sm ml-1">No data / Unplanned audit</span>
-                  </div>
+                <div className="flex items-center">
+                    <span className="w-4 h-4 inline-block bg-green-400 mr-2"></span>
+                    <span className="font-semibold text-sm">A:</span> <span className="text-sm ml-1">Approved by Quality Head</span>
+                </div>
+                <div className="flex items-center">
+                    <span className="w-4 h-4 inline-block bg-red-400 mr-2"></span>
+                    <span className="font-semibold text-sm">R:</span> <span className="text-sm ml-1">Re-scheduling</span>
+                </div>
+                <div className="flex items-center">
+                    <span className="w-4 h-4 inline-block bg-yellow-400 mr-2"></span>
+                    <span className="font-semibold text-sm">S:</span> <span className="text-sm ml-1">Submitted</span>
+                </div>
+                <div className="flex items-center">
+                    <span className="w-4 h-4 inline-block bg-blue-400 mr-2"></span>
+                    <span className="font-semibold text-sm">P:</span> <span className="text-sm ml-1">Reviewed (Team Leader/HOF)</span>
+                </div>
+                <div className="flex items-center">
+                    <span className="w-4 h-4 inline-block bg-gray-300 mr-2"></span>
+                    <span className="font-semibold text-sm">N:</span> <span className="text-sm ml-1">No data / Unplanned audit</span>
+                </div>
               </div>
           </div>
 
