@@ -90,7 +90,3 @@ The core logic resides in a single App.js file, composed of several functional R
 ### **Contributing**
 
 Contributions are welcome\! If you have suggestions for new features, bug fixes, or improvements, please open an issue or submit a pull request.
-
-### **License**
-
-This project is licensed under the MIT License
