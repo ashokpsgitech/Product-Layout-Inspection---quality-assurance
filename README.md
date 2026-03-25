@@ -75,7 +75,7 @@ To get the application up and running, follow these steps:
 
    The application will be available at http://localhost:3000.
 
-### **Code Structure**
+Code Structure
 
 The core logic resides in a single App.js file, composed of several functional React components:
 
